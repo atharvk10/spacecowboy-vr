@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Space Cowboy</title>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #000;
+        overflow: hidden; /* prevents scrollbars from appearing */
+      }
+
+      canvas {
+        display: block; /* removes the small gap browsers add under canvas */
+      }
+
+      /* VR button styling — Three.js injects this button automatically,
+         these rules just reposition and restyle it */
+      #VRButton {
+        position: absolute !important;
+        bottom: 30px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        background: rgba(0, 0, 0, 0.6) !important;
+        border: 1px solid #fff !important;
+        color: #fff !important;
+        font-family: sans-serif !important;
+        font-size: 14px !important;
+        padding: 12px 24px !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        z-index: 999 !important;
+      }
+
+      /* Score overlay — sits in the top corner in 2D mode.
+         In VR you'll want a 3D in-world text mesh instead,
+         but this is useful for testing outside the headset */
+      #score {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        color: #fff;
+        font-family: sans-serif;
+        font-size: 24px;
+        z-index: 999;
+        pointer-events: none; /* won't block clicks/input */
+      }
+
+      /* Loading screen — shown while assets load, hidden once ready */
+      #loading {
+        position: absolute;
+        inset: 0;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-family: sans-serif;
+        font-size: 18px;
+        z-index: 9999;
+      }
+
+      #loading.hidden {
+        display: none;
+      }
+    </style>
+
+    <!-- Import map tells the browser where to find Three.js and its addons.
+         This avoids needing a bundler like Webpack or Vite entirely,
+         which is what lets Live Server work directly. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <!-- Loading indicator -->
+   <!-- <div id="loading">Loading assets...</div> -->
+
+    <!-- Score display -->
+    <div id="score">Score: 0</div>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>
