@@ -1,34 +1,21 @@
-// Pointer lock controls, WASD movement, cannon-es jetpack physics
+// Pointer lock controls, WASD movement, jetpack physics
 
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { scene, camera, renderer, DECK_Y } from './scene.js';
 import { state, dom, showGameHUD, updateHUD, registerJetpackFuelGetter } from './hud.js';
-import { world, CANNON, playerMaterial } from './physics.js';
 
 export const controls = new PointerLockControls(camera, document.body);
 
-const PLAYER_RADIUS = 0.4;
-const PLAYER_GRAVITY = -10.0;  
-
-export const playerBody = new CANNON.Body({
-    mass: 80,
-    material: playerMaterial,
-    shape: new CANNON.Sphere(PLAYER_RADIUS),
-    linearDamping: 0.99,   
-    angularDamping: 1.0,   
-    fixedRotation: true,
-    allowSleep: false,
-});
-playerBody.position.set(4.5, PLAYER_RADIUS, -4.5);
-world.addBody(playerBody);
-
-const JETPACK_THRUST = 900; 
+//Jetpack constants
+const GRAVITY = -6.0;
+const JETPACK_THRUST  = 14.0;
 export const JETPACK_MAX_FUEL = 100;
 const JETPACK_BURN_RATE = 30;
 const JETPACK_REGEN_RATE = 20;
 const MOVE_SPEED = 5.0;
 
+let verticalVel = 0;
 let onDeck = true;
 export let jetpackFuel = JETPACK_MAX_FUEL;
 
@@ -37,10 +24,10 @@ registerJetpackFuelGetter(
     () => JETPACK_MAX_FUEL
 );
 
-//Mouse and keyboard interactions
 export const moveState = { forward: false, backward: false, left: false, right: false };
 export let jetpackActive = false;
 
+//Mouse and WASD controls
 const mouse = { left: false, right: false };
 export const isLeftMouseDown  = () => mouse.left;
 export const isRightMouseDown = () => mouse.right;
@@ -68,12 +55,12 @@ document.addEventListener('keyup', (e) => {
     }
 });
 
-//Jetpack particles animation
+//Particle animation
 const jetpackParticles = [];
 const jpGeo = new THREE.SphereGeometry(0.06, 4, 4);
 const jpMat = new THREE.MeshBasicMaterial({ color: 0x33aaff, transparent: true, opacity: 0.7 });
 
-//Updating the movement for the scene
+//Applying movement
 export function applyMovement(delta) {
     if (renderer.xr.isPresenting || !controls.isLocked || state.gameOver) return;
 
@@ -86,28 +73,12 @@ export function applyMovement(delta) {
     controls.moveRight(dir.x * MOVE_SPEED * delta);
     controls.moveForward(dir.z * MOVE_SPEED * delta);
 
-    playerBody.position.x = camera.position.x;
-    playerBody.position.z = camera.position.z;
-
-    // Apply gravity force manually (world gravity is 0 for space asteroids)
-    if (!onDeck) {
-        playerBody.applyForce(
-            new CANNON.Vec3(0, PLAYER_GRAVITY * playerBody.mass, 0),
-            playerBody.position
-        );
-    }
-
-    // Jetpack thrust
     if (jetpackActive && jetpackFuel > 0) {
-        playerBody.applyForce(
-            new CANNON.Vec3(0, JETPACK_THRUST, 0),
-            playerBody.position
-        );
+        verticalVel += JETPACK_THRUST * delta;
         jetpackFuel -= JETPACK_BURN_RATE * delta;
         if (jetpackFuel < 0) jetpackFuel = 0;
         onDeck = false;
 
-        // Jetpack particle spray
         if (Math.random() < 0.6) {
             const jp = new THREE.Mesh(jpGeo, jpMat.clone());
             jp.position.set(
@@ -124,25 +95,22 @@ export function applyMovement(delta) {
         }
     }
 
-    // Sync camera Y from cannon-es body (body centre + eye offset)
-    camera.position.y = playerBody.position.y + (DECK_Y - PLAYER_RADIUS);
+    // Gravity
+    if (!onDeck) verticalVel += GRAVITY * delta;
 
-    // Floor / deck collision
-    if (playerBody.position.y <= PLAYER_RADIUS + 0.01) {
-        playerBody.position.y = PLAYER_RADIUS;
-        playerBody.velocity.y = 0;
-        onDeck = true;
+    //Changing camera position based on vertical velocity
+    camera.position.y += verticalVel * delta;
+
+    if (camera.position.y <= DECK_Y) {
         camera.position.y = DECK_Y;
-    } else {
-        onDeck = false;
+        verticalVel = 0;
+        onDeck = true;
     }
 
-    // Regen fuel on deck
     if (onDeck && jetpackFuel < JETPACK_MAX_FUEL) {
         jetpackFuel = Math.min(JETPACK_MAX_FUEL, jetpackFuel + JETPACK_REGEN_RATE * delta);
     }
 
-    // Tick jetpack particles
     for (let i = jetpackParticles.length - 1; i >= 0; i--) {
         const p = jetpackParticles[i];
         p.mesh.position.addScaledVector(p.vel, delta);
@@ -157,11 +125,10 @@ export function applyMovement(delta) {
     }
 }
 
-//Reset function
+//Resetting player
 export function resetPlayer() {
-    onDeck     = true;
+    verticalVel = 0;
+    onDeck = true;
     jetpackFuel = JETPACK_MAX_FUEL;
-    playerBody.position.set(4.5, PLAYER_RADIUS, -4.5);
-    playerBody.velocity.set(0, 0, 0);
     camera.position.set(4.5, DECK_Y, -4.5);
 }

@@ -10,11 +10,8 @@ import { updateLasers, resetWeapons, lasers } from './weapons.js';
 import { tryLassoGrab, releaseLasso, updateLasso } from './lasso.js';
 import { asteroids, spawnAsteroid, clearAsteroids, updateAsteroids, checkCollisions } from './asteroids.js';
 import { explosions, updateExplosions, updateSpeedLines, updateShake, triggerShake } from './effects.js';
-import { stepWorld } from './physics.js';
 
 document.addEventListener('contextmenu', e => e.preventDefault());
-
-// ─── Pointer-lock UI wiring ───────────────────────────────────────────────────
 
 dom.blocker.addEventListener('click', () => { if (!state.gameOver) controls.lock(); });
 controls.addEventListener('lock', () => {
@@ -29,8 +26,6 @@ controls.addEventListener('unlock', () => {
     }
 });
 
-// ─── Mouse button wiring ─────────────────────────────────────────────────────
-
 import { setMouseButton } from './player.js';
 
 document.addEventListener('mousedown', (e) => {
@@ -43,13 +38,11 @@ document.addEventListener('mouseup', (e) => {
     if (e.button === 2) releaseLasso(true);
 });
 
-// ─── Restart logic ────────────────────────────────────────────────────────────
-
 dom.gameOver.addEventListener('click', () => {
-    state.lives     = 5;
-    state.score     = 0;
-    state.gameOver  = false;
-    state.invincible      = false;
+    state.lives = 5;
+    state.score = 0;
+    state.gameOver = false;
+    state.invincible = false;
     state.invincibleTimer = 0;
     updateHUD();
 
@@ -66,11 +59,11 @@ dom.gameOver.addEventListener('click', () => {
     resetWeapons();
     releaseLasso(false);
 
-    for (let i = 0; i < 15; i++) spawnAsteroid(true);
+    let asteroid_loop_count = 20;
+    for (let i = 0; i < asteroid_loop_count; i++) spawnAsteroid(true);
 });
 
-// ─── Ship model ───────────────────────────────────────────────────────────────
-
+//Ship Model
 let shipModel = null;
 let bobTime   = 0;
 
@@ -94,22 +87,18 @@ loader.load(
     }
 );
 
-// ─── Initial asteroid field ───────────────────────────────────────────────────
+//Spawning
+for (let i = 0; i < 40; i++) spawnAsteroid(true);
 
-for (let i = 0; i < 15; i++) spawnAsteroid(true);
-
-// ─── Animation loop ───────────────────────────────────────────────────────────
-
+//Animation and updating 
 const clock = new THREE.Clock();
 
 renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
 
     if (!state.gameOver) {
-        // Passive score accumulation while playing
         if (controls.isLocked) { state.score += delta * 10; updateHUD(); }
 
-        // Invincibility blink
         if (state.invincible) {
             state.invincibleTimer -= delta;
             if (state.invincibleTimer <= 0) state.invincible = false;
@@ -118,16 +107,12 @@ renderer.setAnimationLoop(() => {
             shipModel.visible = true;
         }
 
-        // Gentle ship bob
         bobTime += delta;
         if (shipModel) {
             shipModel.position.y  = Math.sin(bobTime * 1.2) * 0.03;
             shipModel.rotation.x  = Math.sin(bobTime * 0.8) * 0.003;
         }
     }
-
-    // Step cannon-es world
-    stepWorld(delta);
 
     const isPlaying = controls.isLocked && !state.gameOver;
 
@@ -142,7 +127,6 @@ renderer.setAnimationLoop(() => {
         updateAsteroids(delta);
         checkCollisions((pts) => { state.score += pts; updateHUD(); });
     } else {
-        // Asteroids drift visually before game starts, but deal no damage
         updateAsteroids(delta);
     }
 

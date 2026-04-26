@@ -1,11 +1,9 @@
-
 // Lasso grab-and-fling system
 
 import * as THREE from 'three';
 import { scene, camera } from './scene.js';
 import { state, dom } from './hud.js';
 import { playLassoGrabSound, playLassoFlingSound, startLassoHum, stopLassoHum, setLassoHumFrequency } from './audio.js';
-import { setAsteroidVelocity } from './asteroids.js';
 
 const LASSO_RANGE = 60;
 const LASSO_ANGLE = 0.3;  
@@ -24,7 +22,7 @@ const lassoLineGeo = new THREE.BufferGeometry().setFromPoints([
 export const lassoGlow = new THREE.PointLight(0xff00aa, 0, 8);
 scene.add(lassoGlow);
 
-//Grabbing objects with lasso
+//Lasso grab functionality
 export function tryLassoGrab(asteroids) {
     if (state.gameOver || lassoTarget) return;
 
@@ -54,15 +52,14 @@ export function tryLassoGrab(asteroids) {
     }
 }
 
-//Releasing the lasso
+//Releasing the asteroid
 export function releaseLasso(fling) {
     if (!lassoTarget) return;
 
     if (fling && lassoTarget.alive) {
         const camDir = new THREE.Vector3();
         camera.getWorldDirection(camDir).normalize();
-        const fv = camDir.multiplyScalar(FLING_SPEED);
-        setAsteroidVelocity(lassoTarget, fv.x, fv.y, fv.z);
+        lassoTarget.vel.copy(camDir.multiplyScalar(FLING_SPEED));
         lassoTarget.flung = true;
         playLassoFlingSound();
     }
@@ -89,13 +86,8 @@ export function updateLasso(delta) {
     const targetPos = camera.position.clone().addScaledVector(camDir, holdDist);
 
     const pullStrength = 8.0;
-    const toTarget = new THREE.Vector3().subVectors(targetPos, new THREE.Vector3(lassoTarget.body.position.x, lassoTarget.body.position.y, lassoTarget.body.position.z));
-    const pull = toTarget.multiplyScalar(pullStrength);
-    const cv = lassoTarget.body.velocity;
-    cv.x += (pull.x - cv.x) * 0.1;
-    cv.y += (pull.y - cv.y) * 0.1;
-    cv.z += (pull.z - cv.z) * 0.1;
-    lassoTarget.body.wakeUp();
+    const toTarget     = new THREE.Vector3().subVectors(targetPos, lassoTarget.mesh.position);
+    lassoTarget.vel.lerp(toTarget.multiplyScalar(pullStrength), 0.1);
 
     if (lassoLine) {
         const pos = lassoLine.geometry.attributes.position;
@@ -104,9 +96,9 @@ export function updateLasso(delta) {
         pos.needsUpdate = true;
     }
 
-    lassoGlow.position.copy(new THREE.Vector3(lassoTarget.body.position.x, lassoTarget.body.position.y, lassoTarget.body.position.z));
+    lassoGlow.position.copy(lassoTarget.mesh.position);
 
-    const dist = camera.position.distanceTo(new THREE.Vector3(lassoTarget.body.position.x, lassoTarget.body.position.y, lassoTarget.body.position.z));
+    const dist = camera.position.distanceTo(lassoTarget.mesh.position);
     setLassoHumFrequency(60 + (1 - Math.min(dist / LASSO_RANGE, 1)) * 120);
 
     if (dist > LASSO_RANGE * 1.5) releaseLasso(false);
