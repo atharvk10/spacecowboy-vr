@@ -14,8 +14,6 @@ import { stepWorld } from './physics.js';
 
 document.addEventListener('contextmenu', e => e.preventDefault());
 
-// ─── Pointer-lock UI wiring ───────────────────────────────────────────────────
-
 dom.blocker.addEventListener('click', () => { if (!state.gameOver) controls.lock(); });
 controls.addEventListener('lock', () => {
     dom.blocker.style.display = 'none';
@@ -29,8 +27,7 @@ controls.addEventListener('unlock', () => {
     }
 });
 
-// ─── Mouse button wiring ─────────────────────────────────────────────────────
-
+//Mouse movement
 import { setMouseButton } from './player.js';
 
 document.addEventListener('mousedown', (e) => {
@@ -43,18 +40,17 @@ document.addEventListener('mouseup', (e) => {
     if (e.button === 2) releaseLasso(true);
 });
 
-// ─── Restart logic ────────────────────────────────────────────────────────────
-
+//Restart logic
 dom.gameOver.addEventListener('click', () => {
-    state.lives     = 5;
-    state.score     = 0;
-    state.gameOver  = false;
-    state.invincible      = false;
+    state.lives = 5;
+    state.score = 0;
+    state.gameOver = false;
+    state.invincible = false;
     state.invincibleTimer = 0;
     updateHUD();
 
     dom.gameOver.style.display = 'none';
-    dom.blocker.style.display  = 'flex';
+    dom.blocker.style.display = 'flex';
     showGameHUD(false);
 
     resetPlayer();
@@ -69,8 +65,7 @@ dom.gameOver.addEventListener('click', () => {
     for (let i = 0; i < 15; i++) spawnAsteroid(true);
 });
 
-// ─── Ship model ───────────────────────────────────────────────────────────────
-
+//Ship model
 let shipModel = null;
 let bobTime   = 0;
 
@@ -94,12 +89,10 @@ loader.load(
     }
 );
 
-// ─── Initial asteroid field ───────────────────────────────────────────────────
-
+//Creating the asteriod field
 for (let i = 0; i < 15; i++) spawnAsteroid(true);
 
-// ─── Animation loop ───────────────────────────────────────────────────────────
-
+//Animation loop
 const clock = new THREE.Clock();
 
 renderer.setAnimationLoop(() => {

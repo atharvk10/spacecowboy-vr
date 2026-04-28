@@ -32,7 +32,7 @@ export function tryLassoGrab(asteroids) {
     camera.getWorldDirection(camDir).normalize();
 
     let bestAsteroid = null;
-    let bestAngle    = LASSO_ANGLE;
+    let bestAngle = LASSO_ANGLE;
 
     for (const a of asteroids) {
         if (!a.alive) continue;
@@ -45,7 +45,7 @@ export function tryLassoGrab(asteroids) {
 
     if (bestAsteroid) {
         lassoTarget = bestAsteroid;
-        lassoLine   = new THREE.Line(lassoLineGeo.clone(), lassoLineMat);
+        lassoLine = new THREE.Line(lassoLineGeo.clone(), lassoLineMat);
         scene.add(lassoLine);
         dom.lassoIndicator.style.display = 'block';
         lassoGlow.intensity = 5;
@@ -85,7 +85,7 @@ export function updateLasso(delta) {
 
     const camDir  = new THREE.Vector3();
     camera.getWorldDirection(camDir).normalize();
-    const holdDist  = 12;
+    const holdDist = 12;
     const targetPos = camera.position.clone().addScaledVector(camDir, holdDist);
 
     const pullStrength = 8.0;

@@ -8,7 +8,7 @@ function ensureAudio() {
 
 export function playBlasterSound() {
     ensureAudio();
-    const osc  = audioCtx.createOscillator();
+    const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.connect(gain); gain.connect(audioCtx.destination);
     osc.type = 'sawtooth';
@@ -21,7 +21,7 @@ export function playBlasterSound() {
 
 export function playLassoGrabSound() {
     ensureAudio();
-    const osc  = audioCtx.createOscillator();
+    const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.connect(gain); gain.connect(audioCtx.destination);
     osc.type = 'sine';
