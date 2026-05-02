@@ -18,7 +18,8 @@ world.defaultContactMaterial.restitution = 0.6;
 export const asteroidMaterial = new CANNON.Material('asteroid');
 export const shipMaterial = new CANNON.Material('ship');
 
-// Asteroids bounce off each other
+// Asteroids bounce off each other 
+
 world.addContactMaterial(new CANNON.ContactMaterial(asteroidMaterial, asteroidMaterial, {
     friction: 0.0,
     restitution: 0.7,
@@ -38,6 +39,11 @@ export const shipBody = new CANNON.Body({
 });
 shipBody.position.set(4.5, 0.5, -4.5);
 world.addBody(shipBody);
+
+// Call every frame to keep the ship collision zone on the player
+export function updateShipBodyPosition(x, y, z) {
+    shipBody.position.set(x, y - 1.1, z); // slightly below eye level = body centre
+}
 
 const FIXED_STEP = 1 / 60;
 const MAX_SUBSTEPS = 3;

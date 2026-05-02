@@ -3,7 +3,6 @@
 import * as THREE from 'three';
 import { scene, camera } from './scene.js';
 import { state, updateHUD, triggerDamageFlash, showGameOver, INVINCIBLE_DURATION } from './hud.js';
-import { controls } from './player.js';
 import { createExplosion, triggerShake } from './effects.js';
 import { releaseLasso, lassoTarget } from './lasso.js';
 import { world, CANNON, asteroidMaterial, shipBody } from './physics.js';
@@ -168,8 +167,7 @@ export function checkCollisions(onScoreAdd) {
             state.invincible      = true;
             state.invincibleTimer = INVINCIBLE_DURATION;
             if (state.lives <= 0) {
-                controls.unlock();
-                showGameOver(state.score);
+                showGameOver(state.score);  // controls.unlock() skipped - breaks in XR
                 releaseLasso(false);
             }
         }
