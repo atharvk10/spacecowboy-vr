@@ -14,8 +14,10 @@ In the environment, asteroids are one of the main elements the player interacts 
 
 ## 3 	Interactions and Features 
 The main interactive elements in the game are the gun, the lasso, and the asteroids, each shaping how the player engages with the environment. The gun is the most direct tool, held in the player’s left hand (left joystick), and is used to quickly aim and shoot incoming asteroids. When the player locks onto an asteroid and presses a button, it is destroyed, emphasizing accuracy and fast reactions as objects move across the player’s view.
+
 The lasso, held in the right hand (right joystick), offers a more skill-based interaction. Instead of destroying asteroids, the player can grab and throw them. The speed and distance of each throw depend on how far back the joystick is pulled, giving the player more control and requiring good timing. Realistic movement is supported through physics interactions using Cannon-ES, making the motion feel natural and responsive.
 Asteroids are the main objects the player interacts with, acting as both targets and obstacles as they move through the space. They vary in size, adding challenge and variety, and the game includes a point system that rewards players based on how many asteroids they successfully destroy. The experience takes place in a full 360-degree environment, where asteroids spawn all around the player rather than just in front of them. This means the player can physically turn and look in any direction to find targets, grab asteroids, and throw them, making the gameplay feel more immersive and active.
+
 Together, these elements create a simple but engaging gameplay loop that balances quick shooting with more controlled, interactive mechanics in an immersive 360-degree setting.
 
 | Type of Interaction | Category | Brief Description |
