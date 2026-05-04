@@ -89,7 +89,6 @@ export function updateShake(delta) {
     }
 }
 
-//Speed lines
 export const SHIP_SPEED = 12;
 
 const speedLines = [];

@@ -11,11 +11,10 @@ import { world, CANNON, asteroidMaterial, shipBody } from './physics.js';
 const SHIP_SPEED = 12;
 
 const planetBounds = [
-    { center: new THREE.Vector3(35, 20, -30),  radius: 12 },
-    { center: new THREE.Vector3(-20, 15, -25), radius: 4  },
-    { center: new THREE.Vector3(15, 25, 30),   radius: 3  },
+    { center: new THREE.Vector3(35, 20, -30), radius: 12},
+    { center: new THREE.Vector3(-20, 15, -25), radius: 4 },
+    { center: new THREE.Vector3(15, 25, 30), radius: 3},
 ];
-
 
 const asteroidGeos = [
     new THREE.IcosahedronGeometry(1, 0),
@@ -45,7 +44,7 @@ function removeAsteroid(index) {
     asteroids.splice(index, 1);
 }
 
-//Spawning the asteriod
+
 export function spawnAsteroid(initialSpread = false) {
     const geo = asteroidGeos[Math.floor(Math.random() * asteroidGeos.length)];
     const mat = asteroidMats[Math.floor(Math.random() * asteroidMats.length)];
@@ -72,7 +71,6 @@ export function spawnAsteroid(initialSpread = false) {
     mesh.position.set(px, py, pz);
     scene.add(mesh);
 
-    // cannon-es sphere body — radius = average of three scale axes
     const radius = (sx + sy + sz) / 3;
     const body = new CANNON.Body({
         mass: radius * 2,
@@ -83,20 +81,12 @@ export function spawnAsteroid(initialSpread = false) {
         allowSleep: false,
     });
     body.position.set(px, py, pz);
-    body.velocity.set(
-        (Math.random()-0.5) * 2,
-        (Math.random()-0.5) * 1,
-        SHIP_SPEED * (0.6 + Math.random() * 0.8)
-    );
-    body.angularVelocity.set(
-        (Math.random()-0.5) * 1,
-        (Math.random()-0.5) * 1,
-        (Math.random()-0.5) * 1
-    );
+    body.velocity.set( (Math.random()-0.5) * 2, (Math.random()-0.5) * 2, SHIP_SPEED * (0.6 + Math.random() * 0.8));
+    body.angularVelocity.set((Math.random()-0.5) * 2, (Math.random()-0.5) * 2,(Math.random()-0.5) * 2);
     world.addBody(body);
 
     const asteroid = { mesh, body, alive: true, flung: false, _hitShip: false };
-
+ 
     body.addEventListener('collide', (e) => {
         if (e.body === shipBody) asteroid._hitShip = true;
     });
@@ -118,18 +108,13 @@ export function setAsteroidVelocity(asteroid, vx, vy, vz) {
     asteroid.body.wakeUp();
 }
 
-// ─── Update — sync meshes from physics bodies, cull out-of-bounds ─────────────
-
 export function updateAsteroids(delta) {
     for (let i = asteroids.length - 1; i >= 0; i--) {
         const a = asteroids[i];
         if (!a.alive) continue;
 
-        // Copy cannon-es transform → Three.js mesh
         a.mesh.position.copy(a.body.position);
         a.mesh.quaternion.copy(a.body.quaternion);
-
-        // Cull if past camera or too far sideways
         if (a.body.position.z > camera.position.z + 30) {
             if (a === lassoTarget) releaseLasso(false);
             removeAsteroid(i);
@@ -142,17 +127,14 @@ export function updateAsteroids(delta) {
         }
     }
 
-    // Replenish the field
-    if (asteroids.length < 20 && Math.random() < 0.15) spawnAsteroid(false);
-    if (asteroids.length < 8)  { for (let k = 0; k < 2; k++) spawnAsteroid(false); }
+    if (asteroids.length < 35 && Math.random() < 0.15) spawnAsteroid(false);
+    if (asteroids.length < 10)  { for (let k = 0; k < 2; k++) spawnAsteroid(false); }
 }
 
-//Collision logic between different game peices
 export function checkCollisions(onScoreAdd) {
     if (state.gameOver) return;
     collidedPairs.clear();
 
-    // Asteroid vs Ship
     for (let i = asteroids.length - 1; i >= 0; i--) {
         const a = asteroids[i];
         if (!a.alive || a === lassoTarget || !a._hitShip) continue;
@@ -175,7 +157,6 @@ export function checkCollisions(onScoreAdd) {
         }
     }
 
-    // Asteroid vs Asteroid — cannon-es handles the bounce; we just score & remove
     for (let i = asteroids.length - 1; i >= 0; i--) {
         if (!asteroids[i]?.alive) continue;
         for (let j = i - 1; j >= 0; j--) {
@@ -205,7 +186,6 @@ export function checkCollisions(onScoreAdd) {
         }
     }
 
-    // Asteroid vs Planet
     for (let i = asteroids.length - 1; i >= 0; i--) {
         const a = asteroids[i];
         if (!a.alive) continue;

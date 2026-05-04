@@ -12,7 +12,7 @@ const JETPACK_THRUST =  18.0;
 export const JETPACK_MAX_FUEL = 100;
 const JETPACK_BURN_RATE = 30;
 const JETPACK_REGEN_RATE = 20;
-const MOVE_SPEED = 5.0;
+const MOVE_SPEED = 10.0;
 
 let verticalVel = 0;
 let onDeck = true;
@@ -23,11 +23,9 @@ registerJetpackFuelGetter(
     () => JETPACK_MAX_FUEL
 );
 
-
 export const moveState = { forward: false, backward: false, left: false, right: false };
 export let jetpackActive = false;
 
-//Mouse controls
 const mouse = { left: false, right: false };
 export const isLeftMouseDown  = () => mouse.left;
 export const isRightMouseDown = () => mouse.right;
@@ -59,11 +57,9 @@ const jetpackParticles = [];
 const jpGeo = new THREE.SphereGeometry(0.06, 4, 4);
 const jpMat = new THREE.MeshBasicMaterial({ color: 0x33aaff, transparent: true, opacity: 0.7 });
 
-//Updating movement
 export function applyMovement(delta) {
     if (renderer.xr.isPresenting || !controls.isLocked || state.gameOver) return;
 
-    // Horizontal (WASD)
     const dir = new THREE.Vector3(
         Number(moveState.right) - Number(moveState.left),
         0,
@@ -73,7 +69,6 @@ export function applyMovement(delta) {
     controls.moveRight(dir.x * MOVE_SPEED * delta);
     controls.moveForward(dir.z * MOVE_SPEED * delta);
 
-    // Jetpack thrust
     if (jetpackActive && jetpackFuel > 0) {
         verticalVel += JETPACK_THRUST * delta;
         jetpackFuel = Math.max(0, jetpackFuel - JETPACK_BURN_RATE * delta);
@@ -95,15 +90,12 @@ export function applyMovement(delta) {
         }
     }
 
-    // Gravity — always pull down when off deck
     if (!onDeck) {
         verticalVel += GRAVITY * delta;
     }
 
-    // Apply vertical velocity
     camera.position.y += verticalVel * delta;
 
-    // Floor / deck collision
     if (camera.position.y <= DECK_Y) {
         camera.position.y = DECK_Y;
         verticalVel = 0;
@@ -112,12 +104,10 @@ export function applyMovement(delta) {
         onDeck = false;
     }
 
-    // Regen fuel only when standing on deck
     if (onDeck) {
         jetpackFuel = Math.min(JETPACK_MAX_FUEL, jetpackFuel + JETPACK_REGEN_RATE * delta);
     }
 
-    // Tick jetpack particles
     for (let i = jetpackParticles.length - 1; i >= 0; i--) {
         const p = jetpackParticles[i];
         p.mesh.position.addScaledVector(p.vel, delta);

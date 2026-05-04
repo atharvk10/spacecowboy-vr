@@ -1,7 +1,7 @@
 // HUD rendering, game state, and game-over logic
 
 export const state = {
-    lives: 5,
+    lives: 3,
     score: 0,
     gameOver: false,
     invincible: false,
@@ -24,6 +24,14 @@ export const dom = {
     jetpackLabel: document.getElementById('jetpack-label'),
 };
 
+// VR HUD callbacks — injected by main.js to avoid circular imports
+let _onHUDUpdate   = null;
+let _onGameOver    = null;
+export function registerVRHUDCallbacks(onUpdate, onGameOver) {
+    _onHUDUpdate = onUpdate;
+    _onGameOver  = onGameOver;
+}
+
 let _getJetpackFuel = () => 100;
 let _getJetpackMax  = () => 100;
 export function registerJetpackFuelGetter(getFuel, getMax) {
@@ -35,6 +43,7 @@ export function updateHUD() {
     dom.lives.textContent = '\u2764 '.repeat(state.lives);
     dom.score.textContent = 'SCORE: ' + Math.floor(state.score);
     dom.jetpackBar.style.width = Math.floor(_getJetpackFuel() / _getJetpackMax() * 100) + '%';
+    if (_onHUDUpdate) _onHUDUpdate(state.lives, state.score);
 }
 
 export function showGameHUD(show) {
@@ -55,6 +64,7 @@ export function showGameOver(finalScore) {
     dom.lassoIndicator.style.display = 'none';
     dom.gameOver.style.display = 'flex';
     dom.gameOver.querySelector('.final-score').textContent = 'FINAL SCORE: ' + Math.floor(finalScore);
+    if (_onGameOver) _onGameOver(finalScore);
 }
 
 export function triggerDamageFlash() {

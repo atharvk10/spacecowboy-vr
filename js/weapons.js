@@ -7,12 +7,10 @@ import { controls, isLeftMouseDown } from './player.js';
 import { playBlasterSound } from './audio.js';
 import { createExplosion } from './effects.js';
 
-//Laser settings
-const LASER_SPEED    = 120;
+const LASER_SPEED = 120;
 const LASER_LIFETIME = 3.0;
 const FIRE_COOLDOWN  = 0.12;
 
-//Geometry and settings
 const laserGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 6);
 laserGeo.rotateX(Math.PI / 2);
 const laserMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.9 });
@@ -29,13 +27,16 @@ let fireCooldownTimer = 0;
 let muzzleFlashTimer  = 0;
 
 export function resetWeapons() {
-    for (const l of lasers) { scene.remove(l.bolt); scene.remove(l.glow); }
-    lasers.length    = 0;
+    for (const l of lasers) { 
+        scene.remove(l.bolt); 
+        scene.remove(l.glow); 
+    }
+
+    lasers.length = 0;
     fireCooldownTimer = 0;
 }
 
-//Shooting from the blaster
-function fireBlaster() {
+export function fireBlaster() {
     if (state.gameOver || fireCooldownTimer > 0) return;
     fireCooldownTimer = FIRE_COOLDOWN;
     playBlasterSound();
@@ -44,7 +45,7 @@ function fireBlaster() {
     camera.getWorldDirection(dir).normalize();
     const spawnPos = camera.position.clone().addScaledVector(dir, 1.5);
     const right = new THREE.Vector3().crossVectors(dir, camera.up).normalize();
-    spawnPos.addScaledVector(right, 0.3);
+    spawnPos.addScaledVector(right, -1.1);
     spawnPos.y -= 0.2;
 
     const bolt = new THREE.Mesh(laserGeo, laserMat);
@@ -66,7 +67,7 @@ function fireBlaster() {
 export function updateLasers(delta, asteroids, lassoTarget, onScoreAdd) {
     if (fireCooldownTimer > 0) fireCooldownTimer -= delta;
 
-    if (isLeftMouseDown() && controls.isLocked && !state.gameOver) fireBlaster(); //auto firing when left click is held
+    if (!state.gameOver && isLeftMouseDown() && controls.isLocked) fireBlaster(); 
 
     if (muzzleFlashTimer > 0) {
         muzzleFlashTimer -= delta;

@@ -1,4 +1,3 @@
-
 // Lasso grab-and-fling system
 
 import * as THREE from 'three';
@@ -14,17 +13,12 @@ const FLING_SPEED = 80;
 export let lassoTarget = null;
 let lassoLine = null;
 
-const lassoLineMat = new THREE.LineBasicMaterial({
-    color: 0xff00aa, transparent: true, opacity: 0.8, linewidth: 2
-});
-const lassoLineGeo = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(), new THREE.Vector3()
-]);
+const lassoLineMat = new THREE.LineBasicMaterial({ color: 0xff00aa, transparent: true, opacity: 0.8, linewidth: 2});
+const lassoLineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
 
 export const lassoGlow = new THREE.PointLight(0xff00aa, 0, 8);
 scene.add(lassoGlow);
 
-//Grabbing objects with lasso
 export function tryLassoGrab(asteroids) {
     if (state.gameOver || lassoTarget) return;
 
@@ -54,7 +48,6 @@ export function tryLassoGrab(asteroids) {
     }
 }
 
-//Releasing the lasso
 export function releaseLasso(fling) {
     if (!lassoTarget) return;
 
@@ -78,7 +71,6 @@ export function releaseLasso(fling) {
     stopLassoHum();
 }
 
-//Updating the lasso
 export function updateLasso(delta) {
     if (!lassoTarget) return;
     if (!lassoTarget.alive) { releaseLasso(false); return; }
@@ -99,7 +91,7 @@ export function updateLasso(delta) {
 
     if (lassoLine) {
         const pos = lassoLine.geometry.attributes.position;
-        pos.setXYZ(0, camera.position.x, camera.position.y - 0.3, camera.position.z);
+        pos.setXYZ(0, camera.position.x + 1, camera.position.y - 0.3, camera.position.z);
         pos.setXYZ(1, lassoTarget.mesh.position.x, lassoTarget.mesh.position.y, lassoTarget.mesh.position.z);
         pos.needsUpdate = true;
     }
