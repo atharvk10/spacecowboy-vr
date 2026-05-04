@@ -44,6 +44,7 @@ export function showGameHUD(show) {
     dom.crosshair.style.display = d;
     dom.jetpackBarWrap.style.display = d;
     dom.jetpackLabel.style.display = d;
+    dom.lassoIndicator.style.display = 'none';
 }
 
 export function showGameOver(finalScore) {

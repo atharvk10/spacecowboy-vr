@@ -1,102 +1,86 @@
 // js/xr.js
-// WebXR controller input
+// WebXR controller input — modelled on the Three.js dragging lab example.
 //
-// RT  (right trigger / selectstart) → shoot laser        (held)
-// LT  (left  trigger / selectstart) → lasso grab/fling   (press=grab, release=fling)
-// LG  (left  grip   / squeezestart) → jetpack            (hold=up, release=fall)
-// Right joystick (axes 2/3)         → move fwd/back/left/right
+// Uses XRControllerModelFactory for real controller visuals (Quest/Index/etc.)
+// Events are wired directly on controller objects (event.target = controller),
+// which is the correct Three.js XR pattern. No session.inputSources[idx] lookup.
+//
+// Controls:
+//   RT  (right selectstart/end)   → shoot laser (held)
+//   LT  (left  selectstart/end)   → lasso grab on press, fling on release
+//   LG  (left  squeezestart/end)  → jetpack thrust
+//   Right joystick (axes 2/3)     → move forward/back/left/right
 
 import * as THREE from 'three';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { renderer, scene, camera } from './scene.js';
 
-// ─── Exported state ───────────────────────────────────────────────────────────
+// ─── Exported state (read every frame by player, weapons, lasso) ──────────────
 
 export const xrState = {
-    isPresenting:           false,
-    rightTriggerDown:       false,   // RT held
-    leftTriggerDown:        false,   // LT held
-    leftTriggerJustPressed:  false,  // LT went down this frame
-    leftTriggerJustReleased: false,  // LT went up this frame
-    leftGripDown:           false,   // LG held
-    rightStickX:            0,
-    rightStickY:            0,
+    isPresenting:            false,
+    rightTriggerDown:        false,
+    leftTriggerDown:         false,
+    leftTriggerJustPressed:  false,   // true for exactly one frame
+    leftTriggerJustReleased: false,   // true for exactly one frame
+    leftGripDown:            false,
+    rightStickX:             0,
+    rightStickY:             0,
 };
 
-// ─── Three.js controller objects ─────────────────────────────────────────────
-// Index 0/1 from getController may be either hand depending on device.
-// We assign them by handedness once sources arrive, but we still need
-// both indices in the scene so events fire.
+// ─── Controller objects ───────────────────────────────────────────────────────
 
-const ctrl  = [renderer.xr.getController(0), renderer.xr.getController(1)];
-const grip  = [renderer.xr.getControllerGrip(0), renderer.xr.getControllerGrip(1)];
-ctrl.forEach(c => scene.add(c));
-grip.forEach(g => scene.add(g));
+const controller1 = renderer.xr.getController(0);
+const controller2 = renderer.xr.getController(1);
+scene.add(controller1);
+scene.add(controller2);
 
-// Hand references — set correctly once input sources report handedness
-let ctrlR = null;   // right hand Three.js controller
-let ctrlL = null;   // left  hand Three.js controller
+// Grip spaces — this is where the controller model attaches
+const controllerGrip1 = renderer.xr.getControllerGrip(0);
+const controllerGrip2 = renderer.xr.getControllerGrip(1);
+scene.add(controllerGrip1);
+scene.add(controllerGrip2);
 
-// Controller visual boxes
-function makeHandBox(color) {
-    return new THREE.Mesh(
-        new THREE.BoxGeometry(0.04, 0.04, 0.12),
-        new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.6 })
-    );
-}
-// Ray pointer lines
-function makeRay(color) {
-    const geo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 0, -25),
-    ]);
-    return new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.45 }));
-}
+// Real controller models (Quest controllers, Index, etc.)
+const controllerModelFactory = new XRControllerModelFactory();
+controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
 
-// ─── Input source tracking ────────────────────────────────────────────────────
+// Laser pointer lines — same technique as the lab example
+const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, -1),
+]);
+const line1 = new THREE.Line(lineGeometry, new THREE.LineBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.5 }));
+line1.name = 'line'; line1.scale.z = 10;
+const line2 = new THREE.Line(lineGeometry.clone(), new THREE.LineBasicMaterial({ color: 0xff00aa, transparent: true, opacity: 0.5 }));
+line2.name = 'line'; line2.scale.z = 10;
+controller1.add(line1);
+controller2.add(line2);
 
+// ─── Handedness tracking ──────────────────────────────────────────────────────
+// We track which Three.js controller object is left/right so ray helpers work.
+
+let ctrlRight = null;
+let ctrlLeft  = null;
+
+// Sources for gamepad axis polling
 const sources = { left: null, right: null };
 
-function assignController(src, index) {
-    const hand = src.handedness;
-    if (hand === 'right') {
-        sources.right = src;
-        ctrlR = ctrl[index];
-        // Attach visuals to the correct grip
-        const g = grip[index];
-        g.add(makeHandBox(0x00ffcc));
-        ctrl[index].add(makeRay(0x00ffcc));
-    } else if (hand === 'left') {
-        sources.left = src;
-        ctrlL = ctrl[index];
-        const g = grip[index];
-        g.add(makeHandBox(0xff00aa));
-        ctrl[index].add(makeRay(0xff00aa));
-    }
-}
+// ─── Session events ───────────────────────────────────────────────────────────
 
 renderer.xr.addEventListener('sessionstart', () => {
     xrState.isPresenting = true;
-    ctrlR = null; ctrlL = null;
+    ctrlRight = null; ctrlLeft = null;
     sources.left = null; sources.right = null;
 
     const session = renderer.xr.getSession();
+    session.addEventListener('inputsourceschange', onInputSourcesChange);
 
-    // Assign any already-connected sources
-    for (let i = 0; i < session.inputSources.length; i++) {
-        assignController(session.inputSources[i], i);
+    // Handle sources that may already exist when session starts
+    if (session.inputSources.length > 0) {
+        onInputSourcesChange({ added: [...session.inputSources], removed: [] });
     }
-
-    session.addEventListener('inputsourceschange', (e) => {
-        for (const src of e.added) {
-            // Find which ctrl index this source corresponds to
-            const idx = [...session.inputSources].indexOf(src);
-            if (idx !== -1) assignController(src, idx);
-        }
-        for (const src of e.removed) {
-            if (src.handedness === 'left')  { sources.left  = null; ctrlL = null; }
-            if (src.handedness === 'right') { sources.right = null; ctrlR = null; }
-        }
-    });
 });
 
 renderer.xr.addEventListener('sessionend', () => {
@@ -110,57 +94,100 @@ renderer.xr.addEventListener('sessionend', () => {
         rightStickX: 0,
         rightStickY: 0,
     });
+    ctrlRight = null; ctrlLeft = null;
     sources.left = null; sources.right = null;
-    ctrlR = null; ctrlL = null;
 });
 
-// ─── Button events (fire on either controller index; filter by handedness) ────
-
-function onSelect(src, down) {
-    if (!src) return;
-    if (src.handedness === 'right') {
-        xrState.rightTriggerDown = down;
-    } else if (src.handedness === 'left') {
-        xrState.leftTriggerDown = down;
-        if (down)  xrState.leftTriggerJustPressed  = true;
-        if (!down) xrState.leftTriggerJustReleased = true;
+function onInputSourcesChange(e) {
+    for (const src of e.added) {
+        if (src.handedness === 'right') {
+            sources.right = src;
+            // Figure out which Three.js controller this source maps to
+            // by checking renderer.xr.getSession().inputSources order
+            const session = renderer.xr.getSession();
+            const idx = [...session.inputSources].indexOf(src);
+            ctrlRight = idx === 0 ? controller1 : controller2;
+        }
+        if (src.handedness === 'left') {
+            sources.left = src;
+            const session = renderer.xr.getSession();
+            const idx = [...session.inputSources].indexOf(src);
+            ctrlLeft = idx === 0 ? controller1 : controller2;
+        }
+    }
+    for (const src of e.removed) {
+        if (src.handedness === 'right') { sources.right = null; ctrlRight = null; }
+        if (src.handedness === 'left')  { sources.left  = null; ctrlLeft  = null; }
     }
 }
 
-function onSqueeze(src, down) {
-    if (!src) return;
-    if (src.handedness === 'left') xrState.leftGripDown = down;
+// ─── Button events — wired directly on controller objects (lab pattern) ───────
+// event.target IS the controller object, so we check which one it is.
+
+function getHandedness(controller) {
+    if (controller === ctrlRight) return 'right';
+    if (controller === ctrlLeft)  return 'left';
+    // Fallback: check the source directly
+    if (sources.right && (controller === controller1 || controller === controller2)) {
+        const session = renderer.xr.getSession();
+        if (!session) return 'unknown';
+        for (const src of session.inputSources) {
+            const idx = [...session.inputSources].indexOf(src);
+            const ctrl = idx === 0 ? controller1 : controller2;
+            if (ctrl === controller) return src.handedness;
+        }
+    }
+    return 'unknown';
 }
 
-// Wire both controller slots — the correct one will match handedness
-for (let i = 0; i < 2; i++) {
-    const idx = i;
-    ctrl[idx].addEventListener('selectstart',  () => {
-        const session = renderer.xr.getSession();
-        if (session) onSelect(session.inputSources[idx], true);
-    });
-    ctrl[idx].addEventListener('selectend', () => {
-        const session = renderer.xr.getSession();
-        if (session) onSelect(session.inputSources[idx], false);
-    });
-    ctrl[idx].addEventListener('squeezestart', () => {
-        const session = renderer.xr.getSession();
-        if (session) onSqueeze(session.inputSources[idx], true);
-    });
-    ctrl[idx].addEventListener('squeezeend', () => {
-        const session = renderer.xr.getSession();
-        if (session) onSqueeze(session.inputSources[idx], false);
-    });
+function onSelectStart(event) {
+    const hand = getHandedness(event.target);
+    if (hand === 'right') {
+        xrState.rightTriggerDown = true;
+    } else if (hand === 'left') {
+        xrState.leftTriggerDown        = true;
+        xrState.leftTriggerJustPressed = true;
+    }
 }
 
-// ─── Axis polling — call once per frame AFTER lasso reads edge flags ──────────
+function onSelectEnd(event) {
+    const hand = getHandedness(event.target);
+    if (hand === 'right') {
+        xrState.rightTriggerDown = false;
+    } else if (hand === 'left') {
+        xrState.leftTriggerDown          = false;
+        xrState.leftTriggerJustReleased  = true;
+    }
+}
+
+function onSqueezeStart(event) {
+    const hand = getHandedness(event.target);
+    if (hand === 'left') xrState.leftGripDown = true;
+}
+
+function onSqueezeEnd(event) {
+    const hand = getHandedness(event.target);
+    if (hand === 'left') xrState.leftGripDown = false;
+}
+
+controller1.addEventListener('selectstart',  onSelectStart);
+controller1.addEventListener('selectend',    onSelectEnd);
+controller1.addEventListener('squeezestart', onSqueezeStart);
+controller1.addEventListener('squeezeend',   onSqueezeEnd);
+
+controller2.addEventListener('selectstart',  onSelectStart);
+controller2.addEventListener('selectend',    onSelectEnd);
+controller2.addEventListener('squeezestart', onSqueezeStart);
+controller2.addEventListener('squeezeend',   onSqueezeEnd);
+
+// ─── Axis polling — call once per frame AFTER all game logic reads edge flags ──
 
 export function pollXRAxes() {
     if (!xrState.isPresenting) return;
 
-    // Right stick: axes[2]=X, axes[3]=Y on Quest/Index
     const r = sources.right;
     if (r?.gamepad?.axes?.length >= 4) {
+        // axes[2] = right stick X, axes[3] = right stick Y on Quest/Index
         xrState.rightStickX = Math.abs(r.gamepad.axes[2]) > 0.12 ? r.gamepad.axes[2] : 0;
         xrState.rightStickY = Math.abs(r.gamepad.axes[3]) > 0.12 ? r.gamepad.axes[3] : 0;
     } else {
@@ -168,7 +195,7 @@ export function pollXRAxes() {
         xrState.rightStickY = 0;
     }
 
-    // Clear one-frame edge flags AFTER game logic has read them
+    // Clear one-frame edge flags after game logic has consumed them
     xrState.leftTriggerJustPressed  = false;
     xrState.leftTriggerJustReleased = false;
 }
@@ -180,25 +207,25 @@ const _quat = new THREE.Quaternion();
 const _dir  = new THREE.Vector3();
 
 export function getRightControllerRay() {
-    if (!xrState.isPresenting || !ctrlR) {
+    if (!xrState.isPresenting || !ctrlRight) {
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
         return { position: camera.position.clone(), direction: dir };
     }
-    ctrlR.getWorldPosition(_pos);
-    ctrlR.getWorldQuaternion(_quat);
+    ctrlRight.getWorldPosition(_pos);
+    ctrlRight.getWorldQuaternion(_quat);
     _dir.set(0, 0, -1).applyQuaternion(_quat);
     return { position: _pos.clone(), direction: _dir.clone() };
 }
 
 export function getLeftControllerRay() {
-    if (!xrState.isPresenting || !ctrlL) {
+    if (!xrState.isPresenting || !ctrlLeft) {
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
         return { position: camera.position.clone(), direction: dir };
     }
-    ctrlL.getWorldPosition(_pos);
-    ctrlL.getWorldQuaternion(_quat);
+    ctrlLeft.getWorldPosition(_pos);
+    ctrlLeft.getWorldQuaternion(_quat);
     _dir.set(0, 0, -1).applyQuaternion(_quat);
     return { position: _pos.clone(), direction: _dir.clone() };
 }
