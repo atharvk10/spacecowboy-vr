@@ -1,7 +1,8 @@
 // Entry point: wires everything together, runs the animation loop
-
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRButton } from 'three/addons/webxr/VRButton.js'; // Added for VR
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js'; // Added for Joysticks
 
 import { scene, camera, renderer, DECK_Y } from './scene.js';
 import { state, dom, updateHUD, showGameHUD, INVINCIBLE_DURATION } from './hud.js';
@@ -12,23 +13,58 @@ import { asteroids, spawnAsteroid, clearAsteroids, updateAsteroids, checkCollisi
 import { explosions, updateExplosions, updateSpeedLines, updateShake, triggerShake } from './effects.js';
 import { stepWorld } from './physics.js';
 
-document.addEventListener('contextmenu', e => e.preventDefault());
+// --- WebXR Initialization ---
+renderer.xr.enabled = true;
+document.body.appendChild(VRButton.createButton(renderer));
 
+const controllerModelFactory = new XRControllerModelFactory();
+
+// Setup VR Controllers
+function setupController(index) {
+    const controller = renderer.xr.getController(index);
+    
+    // Laser trigger (Trigger button)
+    controller.addEventListener('selectstart', () => {
+        if (renderer.xr.isPresenting) {
+            // Logic for firing lasers can be called here or handled in loop
+            setMouseButton(0, true); 
+        }
+    });
+    controller.addEventListener('selectend', () => setMouseButton(0, false));
+
+    // Lasso trigger (Squeeze/Grip button)
+    controller.addEventListener('squeezestart', () => {
+        if (renderer.xr.isPresenting) tryLassoGrab(asteroids);
+    });
+    controller.addEventListener('squeezeend', () => releaseLasso(true));
+
+    scene.add(controller);
+
+    // Add visual models (Joysticks)
+    const grip = renderer.xr.getControllerGrip(index);
+    grip.add(controllerModelFactory.createControllerModel(grip));
+    scene.add(grip);
+}
+
+setupController(0);
+setupController(1);
+
+// --- Existing Mouse Logic ---
+import { setMouseButton } from './player.js';
+document.addEventListener('contextmenu', e => e.preventDefault());
 dom.blocker.addEventListener('click', () => { if (!state.gameOver) controls.lock(); });
+
 controls.addEventListener('lock', () => {
     dom.blocker.style.display = 'none';
     showGameHUD(true);
 });
 controls.addEventListener('unlock', () => {
-    if (!state.gameOver) {
+    if (!state.gameOver && !renderer.xr.isPresenting) {
         dom.blocker.style.display = 'flex';
         showGameHUD(false);
         dom.lassoIndicator.style.display = 'none';
     }
 });
-
-//Mouse movement
-import { setMouseButton } from './player.js';
 
 document.addEventListener('mousedown', (e) => {
     setMouseButton(e.button, true);
@@ -40,7 +76,7 @@ document.addEventListener('mouseup', (e) => {
     if (e.button === 2) releaseLasso(true);
 });
 
-//Restart logic
+// Restart logic
 dom.gameOver.addEventListener('click', () => {
     state.lives = 5;
     state.score = 0;
@@ -48,59 +84,47 @@ dom.gameOver.addEventListener('click', () => {
     state.invincible = false;
     state.invincibleTimer = 0;
     updateHUD();
-
     dom.gameOver.style.display = 'none';
     dom.blocker.style.display = 'flex';
     showGameHUD(false);
-
     resetPlayer();
     clearAsteroids();
-
     for (const e of explosions) { for (const p of e.particles) scene.remove(p.mesh); }
     explosions.length = 0;
-
     resetWeapons();
     releaseLasso(false);
-
     for (let i = 0; i < 15; i++) spawnAsteroid(true);
 });
 
-//Ship model
+// Ship model
 let shipModel = null;
-let bobTime   = 0;
-
+let bobTime = 0;
 const loader = new GLTFLoader();
-loader.load(
-    'space_room.glb',
-    (gltf) => {
-        shipModel = gltf.scene;
-        scene.add(shipModel);
-        renderer.xr.addEventListener('sessionstart', () => {
-            const baseRefSpace = renderer.xr.getReferenceSpace();
-            const transform = new XRRigidTransform({ x: -4.5, y: -0.05, z: 4.5, w: 1 });
-            renderer.xr.setReferenceSpace(baseRefSpace.getOffsetReferenceSpace(transform));
-        });
-        console.log('Spaceship loaded!');
-    },
-    undefined,
-    (error) => {
-        console.error('Error loading space_room.glb:', error);
-        dom.blocker.innerHTML += '<p style="color:#f44">Failed to load space_room.glb. Serve via local web server.</p>';
-    }
-);
+loader.load('space_room.glb', (gltf) => {
+    shipModel = gltf.scene;
+    scene.add(shipModel);
+    console.log('Spaceship loaded!');
+}, undefined, (error) => {
+    console.error('Error loading space_room.glb:', error);
+});
 
-//Creating the asteriod field
+// Create initial asteroids
 for (let i = 0; i < 15; i++) spawnAsteroid(true);
 
-//Animation loop
 const clock = new THREE.Clock();
 
+// --- Main Animation Loop ---
 renderer.setAnimationLoop(() => {
     const delta = Math.min(clock.getDelta(), 0.05);
+    const isPresenting = renderer.xr.isPresenting;
+    const isPlaying = (controls.isLocked || isPresenting) && !state.gameOver;
 
     if (!state.gameOver) {
-        // Passive score accumulation while playing
-        if (controls.isLocked) { state.score += delta * 10; updateHUD(); }
+        // Score accumulation
+        if (isPlaying) { 
+            state.score += delta * 10; 
+            updateHUD(); 
+        }
 
         // Invincibility blink
         if (state.invincible) {
@@ -114,16 +138,14 @@ renderer.setAnimationLoop(() => {
         // Gentle ship bob
         bobTime += delta;
         if (shipModel) {
-            shipModel.position.y  = Math.sin(bobTime * 1.2) * 0.03;
-            shipModel.rotation.x  = Math.sin(bobTime * 0.8) * 0.003;
+            shipModel.position.y = Math.sin(bobTime * 1.2) * 0.03;
+            shipModel.rotation.x = Math.sin(bobTime * 0.8) * 0.003;
         }
     }
 
-    // Step cannon-es world
     stepWorld(delta);
-
-    const isPlaying = controls.isLocked && !state.gameOver;
-
+    
+    // Movements and Effects
     applyMovement(delta);
     updateSpeedLines(delta);
     updateExplosions(delta);
@@ -135,7 +157,6 @@ renderer.setAnimationLoop(() => {
         updateAsteroids(delta);
         checkCollisions((pts) => { state.score += pts; updateHUD(); });
     } else {
-        // Asteroids drift visually before game starts, but deal no damage
         updateAsteroids(delta);
     }
 
